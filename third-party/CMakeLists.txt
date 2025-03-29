@@ -21,7 +21,30 @@ add_subdirectory(glfw)
 add_subdirectory(glm)
 target_compile_definitions(glm PUBLIC GLM_ENABLE_EXPERIMENTAL)
 
-# TODO: Bring ImGui
+# git submodule add --branch docking https://github.com/ocornut/imgui.git
+add_library(imgui STATIC
+  imgui/imgui.cpp
+  imgui/imgui_draw.cpp
+  imgui/imgui_widgets.cpp
+  imgui/imgui_tables.cpp
+  imgui/imgui_demo.cpp # for ImGui::ShowDemoWindow()
+  imgui/backends/imgui_impl_glfw.cpp
+  imgui/backends/imgui_impl_opengl3.cpp
+  imgui/misc/cpp/imgui_stdlib.cpp
+)
+target_compile_definitions(imgui PRIVATE
+  -DGLFW_INCLUDE_NONE
+)
+target_link_libraries(imgui PRIVATE
+  glfw
+)
+target_include_directories(
+  imgui PUBLIC
+  imgui/
+  imgui/backends
+  imgui/misc/cpp
+)
+
 # TODO: Bring Assimp
 # TODO: Bring openimageio
 # TODO: Bring xatlas
