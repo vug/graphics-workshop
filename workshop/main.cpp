@@ -1,6 +1,7 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glad/gl.h>
+#include <glm/glm.hpp>
 
 #include <print>
 
@@ -35,6 +36,9 @@ int main() {
   }
   std::println("Loaded OpenGL version {}.{}", GLAD_VERSION_MAJOR(version),
                GLAD_VERSION_MINOR(version));
+
+  glm::vec3 origin{};
+  std::println("Origin: ({}, {}, {})", origin.x, origin.y, origin.z);
 
   glViewport(0, 0, kWidth, kHeight);
   while (!glfwWindowShouldClose(window)) {

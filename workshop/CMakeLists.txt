@@ -11,6 +11,7 @@ add_executable(${TARGET}
 target_link_libraries(${TARGET} PUBLIC
   glad
   glfw
+  glm
 )
 
 # cxx_std_26 was added in CMake v3.30
