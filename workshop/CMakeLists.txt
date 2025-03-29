@@ -12,6 +12,7 @@ target_link_libraries(${TARGET} PUBLIC
   glad
   glfw
   glm
+  imgui
 )
 
 # cxx_std_26 was added in CMake v3.30
