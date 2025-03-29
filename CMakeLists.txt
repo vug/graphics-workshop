@@ -9,3 +9,4 @@ project(GraphicsWorkshop
   LANGUAGES CXX)
 
 add_subdirectory(third-party)
+add_subdirectory(workshop)
