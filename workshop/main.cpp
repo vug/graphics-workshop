@@ -14,6 +14,9 @@
 #include <print>
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
+// Load shader programs compiled to SPIR-V binary format from given files into a new shader program
+// Returns 0 on error
+GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
 
 int main() {
   std::println("Hi!");
@@ -93,70 +96,12 @@ int main() {
   const OIIO::ImageSpec &spec = inp->spec();
   std::println("Image: width {}, height {}, depth {}, channels {}", spec.width, spec.height, spec.depth, spec.nchannels);
 
-  GLuint vertShader = glCreateShader(GL_VERTEX_SHADER);
-  {
-    const std::filesystem::path vertFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/triangle_without_vbo_vert.spv"};
-    if (!std::filesystem::exists(vertFile)) {
-      std::println("File does not exist: {}", vertFile.string());
-      return 1;
-    }    
-    const auto fileSize = std::filesystem::file_size(vertFile);
-    if (fileSize == 0) {
-      std::println("File is empty: {}", vertFile.string());
-      return 1;
-    }    
-    std::ifstream file(vertFile, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
-      std::println("Error opening shader file: {}", vertFile.string());
-      return 1;
-    }
-    file.seekg(0, std::ios::beg);
-    std::vector<std::byte> buffer(fileSize);
-    file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
-    file.close();  
-
-    glShaderBinary(1, &vertShader, GL_SHADER_BINARY_FORMAT_SPIR_V, buffer.data(), static_cast<GLsizei>(buffer.size()));
-    glSpecializeShader(vertShader, "main", 0, nullptr, nullptr);
-    int32_t success{};
-    glGetShaderiv(vertShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-      char infoLog[512];
-      glGetShaderInfoLog(vertShader, 512, NULL, infoLog);
-      std::println(std::cerr, "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{}", infoLog);
-      return 1;
-    }    
-  }
-  GLuint fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-  {
-    const std::filesystem::path fragFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/triangle_without_vbo_frag.spv"};
-    std::ifstream file(fragFile, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
-      std::println("Error opening shader file: {}", fragFile.string());
-      return 1;
-    }
-    const auto fileSize = std::filesystem::file_size(fragFile);
-    std::vector<std::byte> buffer(fileSize);
-    file.seekg(0, std::ios::beg);
-    file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
-    file.close();  
-
-    glShaderBinary(1, &fragShader, GL_SHADER_BINARY_FORMAT_SPIR_V, buffer.data(), static_cast<GLsizei>(buffer.size()));
-    glSpecializeShader(fragShader, "main", 0, nullptr, nullptr);    
-  }
-  const GLuint program = glCreateProgram();
-  glAttachShader(program, vertShader);
-  glAttachShader(program, fragShader);
-  glLinkProgram(program);
-  int32_t success;
-  glGetProgramiv(program, GL_LINK_STATUS, &success);
-  if (!success) {
-    if (!success) {
-      char infoLog[512];
-      glGetProgramInfoLog(program, 512, NULL, infoLog);
-      std::println(std::cerr, "ERROR::SHADER::PROGRAM::LINKING_FAILED\n{}", infoLog);
-      return success;
-    }
-
+   
+  const std::filesystem::path vertFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/triangle_without_vbo_vert.spv"};
+  const std::filesystem::path fragFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/triangle_without_vbo_frag.spv"};
+  GLuint program = loadShaderSpirV(vertFile, fragFile);
+  if (program == 0) {
+    std::println("Error loading shaders.");
     return 1;
   }
 
@@ -204,4 +149,84 @@ int main() {
 void keyCallback(GLFWwindow* window, int key, [[maybe_unused]] int scancode, int action, [[maybe_unused]] int mode) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     glfwSetWindowShouldClose(window, GL_TRUE);
+}
+
+bool readBinaryFile(const std::filesystem::path& path, std::vector<std::byte>& outBuffer) {
+  if (!std::filesystem::exists(path)) {
+    std::println("File does not exist: {}", path.string());
+    return false;
+  }    
+  const auto fileSize = std::filesystem::file_size(path);
+  if (fileSize == 0) {
+    std::println("File is empty: {}", path.string());
+    return false;
+  }    
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  if (!file.is_open()) {
+    std::println("Error opening shader file: {}", path.string());
+    return false;
+  }
+
+  file.seekg(0, std::ios::beg);
+  outBuffer.resize(fileSize);
+  file.read(reinterpret_cast<char*>(outBuffer.data()), fileSize);
+  file.close(); 
+  
+  return true;
+}
+
+GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
+  int32_t success{};
+  const uint32_t infoLogSize = 512;
+  char infoLog[512];
+
+  std::vector<std::byte> vertBuffer;
+  if(!readBinaryFile(vertPath, vertBuffer)) {
+    return 0;
+  }
+  GLuint vertShader = glCreateShader(GL_VERTEX_SHADER);
+  glShaderBinary(1, &vertShader, GL_SHADER_BINARY_FORMAT_SPIR_V, vertBuffer.data(), static_cast<GLsizei>(vertBuffer.size()));
+  glSpecializeShader(vertShader, "main", 0, nullptr, nullptr);
+  glGetShaderiv(vertShader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    glGetShaderInfoLog(vertShader, infoLogSize, NULL, infoLog);
+    std::println(std::cerr, "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{}", infoLog);
+    glDeleteShader(vertShader);
+    return 0;
+  }
+
+  std::vector<std::byte> fragBuffer;
+  if(!readBinaryFile(fragPath, fragBuffer)) {
+    glDeleteShader(vertShader);
+    return 0;
+  }
+  GLuint fragShader = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderBinary(1, &fragShader, GL_SHADER_BINARY_FORMAT_SPIR_V, fragBuffer.data(), static_cast<GLsizei>(fragBuffer.size()));
+  glSpecializeShader(fragShader, "main", 0, nullptr, nullptr);    
+  glGetShaderiv(fragShader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    glGetShaderInfoLog(fragShader, infoLogSize, NULL, infoLog);
+    std::println(std::cerr, "ERROR::SHADER::FRAG::COMPILATION_FAILED\n{}", infoLog);
+    glDeleteShader(vertShader);
+    glDeleteShader(fragShader);
+    return 0;
+  }
+
+  const GLuint program = glCreateProgram();
+  glAttachShader(program, vertShader);
+  glAttachShader(program, fragShader);
+  glLinkProgram(program);
+  glGetProgramiv(program, GL_LINK_STATUS, &success);
+  if (!success) {
+    glGetProgramInfoLog(program, infoLogSize, NULL, infoLog);
+    std::println(std::cerr, "ERROR::SHADER::PROGRAM::LINKING_FAILED\n{}", infoLog);
+    glDeleteShader(vertShader);
+    glDeleteShader(fragShader);
+    glDeleteProgram(program);
+    return 0; 
+  }
+
+  glDeleteShader(vertShader);
+  glDeleteShader(fragShader);
+  return program;
 }
