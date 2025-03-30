@@ -1,3 +1,5 @@
+add_compile_options(/W0)
+
 # Could've added as a git submodule via following command:
 #     git submodule add --branch glad2 https://github.com/Dav1dde/glad.git
 # However, that'd require Python and jinja2 be installed.
