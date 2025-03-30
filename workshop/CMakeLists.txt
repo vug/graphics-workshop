@@ -9,6 +9,7 @@ add_executable(${TARGET}
 )
 
 target_link_libraries(${TARGET} PUBLIC
+  assimp
   glad
   glfw
   glm

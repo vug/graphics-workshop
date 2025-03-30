@@ -1,11 +1,15 @@
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glad/gl.h>
+#include <glm/glm.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-#include <glm/glm.hpp>
 
+#include <filesystem>
 #include <print>
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -21,7 +25,7 @@ int main() {
   glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
   glfwWindowHint(GLFW_SAMPLES, 8);
 
-  const GLuint kWidth = 800, kHeight = 600;
+  const GLuint kWidth = 1280, kHeight = 768;
   GLFWwindow* window =
       glfwCreateWindow(kWidth, kHeight, "LearnOpenGL", NULL, NULL);
   if (!window) {
@@ -61,6 +65,23 @@ int main() {
   glm::vec3 origin{};
   std::println("Origin: ({}, {}, {})", origin.x, origin.y, origin.z);
 
+  std::filesystem::path modelFile{"C:/Users/veliu/repos/graphics-workshop/assets/models/teapot/teapot.obj"};
+  std::println("Loading model file: {}...", modelFile.string());
+  Assimp::Importer importer;
+  const aiScene* scene = importer.ReadFile(modelFile.string(),
+    aiProcess_CalcTangentSpace       |
+    aiProcess_Triangulate            |
+    aiProcess_JoinIdenticalVertices  |
+    aiProcess_SortByPType);
+  if (!scene) {
+    std::println("Error loading model file: {}", importer.GetErrorString());
+    return 1;
+  }
+  for (uint32_t meshIx = 0; meshIx < scene->mNumMeshes; ++meshIx) {
+    const aiMesh* mesh = scene->mMeshes[meshIx];
+    std::println("Mesh {}: {} vertices, {} faces.", meshIx, mesh->mNumVertices, mesh->mNumFaces);
+  }
+
   glViewport(0, 0, kWidth, kHeight);
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
@@ -75,8 +96,7 @@ int main() {
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
       GLFWwindow* backup_current_context = glfwGetCurrentContext();
       ImGui::UpdatePlatformWindows();
       ImGui::RenderPlatformWindowsDefault();
