@@ -53,6 +53,27 @@ set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_USD_IMPORTER OFF CACHE BOOL "" FORCE)
 add_subdirectory(assimp)
 
+# Attempt 1
+# Requires a lot of dependencies: https://github.com/AcademySoftwareFoundation/OpenImageIO/blob/main/INSTALL.md#building-on-windows
+# https://github.com/AcademySoftwareFoundation/Imath
+# https://github.com/AcademySoftwareFoundation/openexr
+# https://github.com/madler/zlib
+# https://gitlab.com/libtiff/libtiff
+# https://github.com/libjpeg-turbo/libjpeg-turbo
+# couldn't make it work...
+#
+# Attempt 2
+# install vcpkg
+# vcpkg install openimageio:x64-windows-static
+# copy lib file and headers manually here
+# add_library(OpenImageIO STATIC IMPORTED)
+# set_target_properties(OpenImageIO PROPERTIES IMPORTED_LOCATION C:/Users/veliu/repos/graphics-workshop/third-party/OpenImageIO/OpenImageIO.lib)
+# target_include_directories(OpenImageIO INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/OpenImageIO/include)
+# couldn't make it work...
+#
+# Attempt 3
+# vcpkg install openimageio
+# Now find_package(OpenImageIO REQUIRED) can be added to the project root CMakeLists.txt
+# message(OpenImageIO_INCLUDE_DIR " ${OpenImageIO_INCLUDE_DIR}")
 
-# TODO: Bring openimageio
 # TODO: Bring xatlas

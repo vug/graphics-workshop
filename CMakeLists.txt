@@ -8,5 +8,7 @@ project(GraphicsWorkshop
   DESCRIPTION "Some 3rd party graphics libraries and some custom functionalities on top of them, so that I won't need to start a new repo from scratch each time I study a topic in computer graphics."
   LANGUAGES CXX)
 
+include(C:/Users/veliu/repos-other/vcpkg/scripts/buildsystems/vcpkg.cmake)
+find_package(OpenImageIO REQUIRED)
 add_subdirectory(third-party)
 add_subdirectory(workshop)

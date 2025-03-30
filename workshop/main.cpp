@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <OpenImageIO/imageio.h>
 
 #include <filesystem>
 #include <print>
@@ -65,14 +66,14 @@ int main() {
   glm::vec3 origin{};
   std::println("Origin: ({}, {}, {})", origin.x, origin.y, origin.z);
 
-  std::filesystem::path modelFile{"C:/Users/veliu/repos/graphics-workshop/assets/models/teapot/teapot.obj"};
+  const std::filesystem::path modelFile{"C:/Users/veliu/repos/graphics-workshop/assets/models/teapot/teapot.obj"};
   std::println("Loading model file: {}...", modelFile.string());
   Assimp::Importer importer;
   const aiScene* scene = importer.ReadFile(modelFile.string(),
-    aiProcess_CalcTangentSpace       |
-    aiProcess_Triangulate            |
-    aiProcess_JoinIdenticalVertices  |
-    aiProcess_SortByPType);
+  aiProcess_CalcTangentSpace       |
+  aiProcess_Triangulate            |
+  aiProcess_JoinIdenticalVertices  |
+  aiProcess_SortByPType);
   if (!scene) {
     std::println("Error loading model file: {}", importer.GetErrorString());
     return 1;
@@ -81,6 +82,16 @@ int main() {
     const aiMesh* mesh = scene->mMeshes[meshIx];
     std::println("Mesh {}: {} vertices, {} faces.", meshIx, mesh->mNumVertices, mesh->mNumFaces);
   }
+  
+  std::println("loading a texture");
+  const std::filesystem::path texFile{"C:/Users/veliu/repos/graphics-workshop/assets/textures/openimageio-acronym-gradient.png"};
+  auto inp = OIIO::ImageInput::open(texFile.string());
+  if(!inp) {
+    std::println("Error loading texture file: {}", OIIO::geterror());
+    return 1;
+  }
+  const OIIO::ImageSpec &spec = inp->spec();
+  std::println("Image: width {}, height {}, depth {}, channels {}", spec.width, spec.height, spec.depth, spec.nchannels);
 
   glViewport(0, 0, kWidth, kHeight);
   while (!glfwWindowShouldClose(window)) {

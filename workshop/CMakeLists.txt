@@ -1,7 +1,9 @@
 set(TARGET Workshop)
 
 # /WX if warnings should be treated as errors
-add_compile_options(/W4 /external:I${PROJECT_SOURCE_DIR}/third-party /external:W0)
+# /utf-8 is needed for dealing with following issue: [openimageio] /utf-8 is required on Windows, but not supplied by the cmake target · Issue #41405 · microsoft/vcpkg https://github.com/microsoft/vcpkg/issues/41405
+# solution from: 'Unicode support requires compiling with /utf-8' compiling with msvc · Issue #42965 · microsoft/vcpkg https://github.com/microsoft/vcpkg/issues/42965
+add_compile_options(/utf-8 /W4 /external:I${PROJECT_SOURCE_DIR}/third-party /external:W0)
 # consider target_compile_options
 
 add_executable(${TARGET}
@@ -14,6 +16,7 @@ target_link_libraries(${TARGET} PUBLIC
   glfw
   glm
   imgui
+  OpenImageIO::OpenImageIO
 )
 
 # cxx_std_26 was added in CMake v3.30
