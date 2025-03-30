@@ -45,6 +45,14 @@ target_include_directories(
   imgui/misc/cpp
 )
 
-# TODO: Bring Assimp
+# git submodule add https://github.com/assimp/assimp.git
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+# USD importing was experimental by the time we added assimp
+set(ASSIMP_BUILD_USD_IMPORTER OFF CACHE BOOL "" FORCE)
+add_subdirectory(assimp)
+
+
 # TODO: Bring openimageio
 # TODO: Bring xatlas
