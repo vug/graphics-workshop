@@ -18,6 +18,19 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 // Returns 0 on error
 GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
 
+struct Vertex {
+  glm::vec3 position;
+  glm::vec3 normal;
+  glm::vec2 texCoord0;
+};
+
+struct Mesh {
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
+};
+
+void loadMeshesFromAiNode(aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes);
+
 int main() {
   std::println("Hi!");
 
@@ -73,11 +86,12 @@ int main() {
   std::println("Loading model file: {}...", modelFile.string());
   Assimp::Importer importer;
   const aiScene* scene = importer.ReadFile(modelFile.string(),
-  aiProcess_CalcTangentSpace       |
   aiProcess_Triangulate            |
+  aiProcess_GenNormals             |
+  aiProcess_CalcTangentSpace       |
   aiProcess_JoinIdenticalVertices  |
   aiProcess_SortByPType);
-  if (!scene) {
+  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
     std::println("Error loading model file: {}", importer.GetErrorString());
     return 1;
   }
@@ -85,6 +99,8 @@ int main() {
     const aiMesh* mesh = scene->mMeshes[meshIx];
     std::println("Mesh {}: {} vertices, {} faces.", meshIx, mesh->mNumVertices, mesh->mNumFaces);
   }
+  std::vector<Mesh> meshes;
+  loadMeshesFromAiNode(scene->mRootNode, scene, meshes);
   
   std::println("loading a texture");
   const std::filesystem::path texFile{"C:/Users/veliu/repos/graphics-workshop/assets/textures/openimageio-acronym-gradient.png"};
@@ -229,4 +245,50 @@ GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesys
   glDeleteShader(vertShader);
   glDeleteShader(fragShader);
   return program;
+}
+
+Mesh processMesh(const aiMesh *mesh, const aiScene *scene) {
+  Mesh outMesh;
+  outMesh.vertices.reserve(mesh->mNumVertices);
+  for (uint32_t vertIx = 0; vertIx < mesh->mNumVertices; ++vertIx) {
+    Vertex& vertex = outMesh.vertices.emplace_back();
+    if (mesh->HasPositions()) {
+      vertex.position = {mesh->mVertices[vertIx].x, mesh->mVertices[vertIx].y, mesh->mVertices[vertIx].z};
+    } else {
+      vertex.position = {};
+    }
+    if (mesh->HasNormals()) {
+      vertex.normal = {mesh->mNormals[vertIx].x, mesh->mNormals[vertIx].y, mesh->mNormals[vertIx].z};
+    }
+    else {
+      vertex.normal = {};
+    }
+    if (mesh->mTextureCoords[0]) {
+      vertex.texCoord0 = {mesh->mTextureCoords[0][vertIx].x, mesh->mTextureCoords[0][vertIx].y};
+    } else {
+      vertex.texCoord0 = {};
+    }
+  }
+  outMesh.indices.reserve(mesh->mNumFaces * 3);
+  for (uint32_t i = 0; i < mesh->mNumFaces; ++i) {
+    const aiFace& face = mesh->mFaces[i];
+    assert(face.mNumIndices == 3);
+    for (uint32_t j = 0; j < face.mNumIndices; ++j) {
+      outMesh.indices.push_back(face.mIndices[j]);
+    }
+  }
+
+  aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+  std::println("Processing mesh '{}'. has position? {}, has normals? {}, has TexCoord0? {}, uv channels {}. Material '{}'", mesh->mName.C_Str(), mesh->HasPositions(), mesh->HasNormals(), mesh->HasTextureCoords(0), mesh->GetNumUVChannels(), material->GetName().C_Str());
+  return outMesh;
+}
+
+void loadMeshesFromAiNode(aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes) {
+  for(unsigned int i = 0; i < node->mNumMeshes; i++) {
+      aiMesh *mesh = scene->mMeshes[node->mMeshes[i]]; 
+      outMeshes.push_back(processMesh(mesh, scene));			
+  }
+  for(unsigned int i = 0; i < node->mNumChildren; i++) {
+    loadMeshesFromAiNode(node->mChildren[i], scene, outMeshes);
+  }
 }
