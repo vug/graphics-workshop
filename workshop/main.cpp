@@ -21,13 +21,62 @@ GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesys
 struct Vertex {
   glm::vec3 position;
   glm::vec3 normal;
-  glm::vec2 texCoord0;
+  glm::vec2 texCoord1;
 };
 
 struct Mesh {
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
+  // TODO: upload mesh data to GPU and render it with simple shader
 };
+
+struct MeshGpu {
+  GLuint vertexArray;
+  GLuint vertexBuffer;
+  GLuint indexBuffer;
+};
+
+GLuint createVertexBuffer(uint32_t numVertices, GLuint vao) {
+  GLuint vbo;
+  glCreateBuffers(1, &vbo);
+  glNamedBufferStorage(vbo, sizeof(Vertex) * numVertices, nullptr, GL_DYNAMIC_STORAGE_BIT);
+  glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
+  return vbo;
+};
+
+GLuint createIndexBuffer(uint32_t numIndices, GLuint vao) {
+  GLuint ibo;
+  glCreateBuffers(1, &ibo);
+  glNamedBufferStorage(ibo, sizeof(uint32_t) * numIndices, nullptr, GL_DYNAMIC_STORAGE_BIT);
+  glVertexArrayElementBuffer(vao, ibo);
+  return ibo;
+}
+
+MeshGpu createMeshGpu(const Mesh& mesh) {
+  MeshGpu m{};
+  glCreateVertexArrays(1, &m.vertexArray);
+  glBindVertexArray(m.vertexArray);
+
+  // See Vertex. {position, normal, texCoord1}
+  static const std::vector<int32_t> sizes = {3, 3, 2};
+  uint32_t offset = 0;
+  for (uint32_t ix = 0; ix < sizes.size(); ++ix) {
+    glEnableVertexArrayAttrib(m.vertexArray, ix);
+    glVertexArrayAttribFormat(m.vertexArray, ix, sizes[ix], GL_FLOAT, GL_FALSE, offset);
+    glVertexArrayAttribBinding(m.vertexArray, ix, 0);
+    offset += sizes[ix] * sizeof(float);
+  }
+  
+  m.vertexBuffer = createVertexBuffer(static_cast<uint32_t>(mesh.vertices.size()), m.vertexArray);
+  m.indexBuffer = createIndexBuffer(static_cast<uint32_t>(mesh.indices.size()), m.vertexArray);
+
+  glNamedBufferSubData(m.vertexBuffer, 0, sizeof(Vertex) * mesh.vertices.size(), mesh.vertices.data());
+  glNamedBufferSubData(m.indexBuffer, 0, sizeof(uint32_t) * mesh.indices.size(), mesh.indices.data());
+
+  return m;
+}
+
+
 
 void loadMeshesFromAiNode(aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes);
 
@@ -101,6 +150,10 @@ int main() {
   }
   std::vector<Mesh> meshes;
   loadMeshesFromAiNode(scene->mRootNode, scene, meshes);
+  std::vector<MeshGpu> meshGpus;
+  for (const auto& mesh : meshes) {
+    meshGpus.push_back(createMeshGpu(mesh));
+  }
   
   std::println("loading a texture");
   const std::filesystem::path texFile{"C:/Users/veliu/repos/graphics-workshop/assets/textures/openimageio-acronym-gradient.png"};
@@ -264,9 +317,9 @@ Mesh processMesh(const aiMesh *mesh, const aiScene *scene) {
       vertex.normal = {};
     }
     if (mesh->mTextureCoords[0]) {
-      vertex.texCoord0 = {mesh->mTextureCoords[0][vertIx].x, mesh->mTextureCoords[0][vertIx].y};
+      vertex.texCoord1 = {mesh->mTextureCoords[0][vertIx].x, mesh->mTextureCoords[0][vertIx].y};
     } else {
-      vertex.texCoord0 = {};
+      vertex.texCoord1 = {};
     }
   }
   outMesh.indices.reserve(mesh->mNumFaces * 3);
