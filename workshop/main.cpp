@@ -34,6 +34,8 @@ struct MeshGpu {
   GLuint vertexArray;
   GLuint vertexBuffer;
   GLuint indexBuffer;
+  size_t numVertices;
+  size_t numIndices;
 };
 
 GLuint createVertexBuffer(uint32_t numVertices, GLuint vao) {
@@ -67,11 +69,14 @@ MeshGpu createMeshGpu(const Mesh& mesh) {
     offset += sizes[ix] * sizeof(float);
   }
   
-  m.vertexBuffer = createVertexBuffer(static_cast<uint32_t>(mesh.vertices.size()), m.vertexArray);
-  m.indexBuffer = createIndexBuffer(static_cast<uint32_t>(mesh.indices.size()), m.vertexArray);
+  m.numVertices = mesh.vertices.size();
+  m.vertexBuffer = createVertexBuffer(static_cast<uint32_t>(m.numVertices), m.vertexArray);
 
-  glNamedBufferSubData(m.vertexBuffer, 0, sizeof(Vertex) * mesh.vertices.size(), mesh.vertices.data());
-  glNamedBufferSubData(m.indexBuffer, 0, sizeof(uint32_t) * mesh.indices.size(), mesh.indices.data());
+  m.numIndices = mesh.indices.size(); 
+  m.indexBuffer = createIndexBuffer(static_cast<uint32_t>(m.numIndices), m.vertexArray);
+
+  glNamedBufferSubData(m.vertexBuffer, 0, sizeof(Vertex) * m.numVertices, mesh.vertices.data());
+  glNamedBufferSubData(m.indexBuffer, 0, sizeof(uint32_t) * m.numIndices, mesh.indices.data());
 
   return m;
 }
@@ -151,7 +156,11 @@ int main() {
   std::vector<Mesh> meshes;
   loadMeshesFromAiNode(scene->mRootNode, scene, meshes);
   std::vector<MeshGpu> meshGpus;
-  for (const auto& mesh : meshes) {
+  // TODO: make mesh const  again, and replace x0.1 with worldFromObject matrix
+  for (auto& mesh : meshes) {
+    for (auto& v : mesh.vertices) {
+      v.position *= 0.1f;
+    }
     meshGpus.push_back(createMeshGpu(mesh));
   }
   
@@ -166,16 +175,13 @@ int main() {
   std::println("Image: width {}, height {}, depth {}, channels {}", spec.width, spec.height, spec.depth, spec.nchannels);
 
    
-  const std::filesystem::path vertFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/triangle_without_vbo_vert.spv"};
-  const std::filesystem::path fragFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/triangle_without_vbo_frag.spv"};
+  const std::filesystem::path vertFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/solid_color_vert.spv"};
+  const std::filesystem::path fragFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/solid_color_frag.spv"};
   GLuint program = loadShaderSpirV(vertFile, fragFile);
   if (program == 0) {
     std::println("Error loading shaders.");
     return 1;
   }
-
-  uint32_t vertexArray;
-  glCreateVertexArrays(1, &vertexArray);
 
   glViewport(0, 0, kWidth, kHeight);
   while (!glfwWindowShouldClose(window)) {
@@ -186,11 +192,15 @@ int main() {
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
+    glEnable(GL_CULL_FACE);
 
     glUseProgram(program);
-    glBindVertexArray(vertexArray);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
+    for (const MeshGpu& mg : meshGpus) {
+      glBindVertexArray(mg.vertexArray);
+      
+      glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mg.numIndices), GL_UNSIGNED_INT, nullptr);
+      glBindVertexArray(0);
+    }
     glUseProgram(0);
 
     ImGui::ShowDemoWindow();
