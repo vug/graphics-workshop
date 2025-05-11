@@ -4,7 +4,9 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glad/gl.h>
+#define GLM_FORCE_COLUMN_MAJOR
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -27,7 +29,6 @@ struct Vertex {
 struct Mesh {
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
-  // TODO: upload mesh data to GPU and render it with simple shader
 };
 
 struct MeshGpu {
@@ -81,9 +82,33 @@ MeshGpu createMeshGpu(const Mesh& mesh) {
   return m;
 }
 
-
-
 void loadMeshesFromAiNode(aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes);
+
+template<typename T>
+T& createPersistentUniformBuffer(uint32_t binding) {
+  const size_t sizeBytes = sizeof(T);
+  GLuint ubo;
+  glCreateBuffers(1, &ubo);
+  const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+  glNamedBufferStorage(ubo, sizeBytes, nullptr, flags);
+  glBindBufferBase(GL_UNIFORM_BUFFER, binding, ubo);
+
+  void* mappedPtr = static_cast<T*>(glMapNamedBufferRange(ubo, 0, sizeBytes, flags));
+  if (mappedPtr == nullptr) {
+    std::println("Failed to map uniform buffer {} of size {} persistently!", ubo, sizeBytes);
+    glDeleteBuffers(1, &ubo);
+    auto obj = T{};
+    return obj;
+  }
+  T& uboDataStruct = *static_cast<T*>(mappedPtr);
+
+  return uboDataStruct;
+}
+
+struct PerFrameData {
+  glm::mat4 viewFromWorld;
+  glm::mat4 projectionFromView;
+};
 
 int main() {
   std::println("Hi!");
@@ -156,13 +181,8 @@ int main() {
   std::vector<Mesh> meshes;
   loadMeshesFromAiNode(scene->mRootNode, scene, meshes);
   std::vector<MeshGpu> meshGpus;
-  // TODO: make mesh const  again, and replace x0.1 with worldFromObject matrix
-  for (auto& mesh : meshes) {
-    for (auto& v : mesh.vertices) {
-      v.position *= 0.1f;
-    }
+  for (const auto& mesh : meshes)
     meshGpus.push_back(createMeshGpu(mesh));
-  }
   
   std::println("loading a texture");
   const std::filesystem::path texFile{"C:/Users/veliu/repos/graphics-workshop/assets/textures/openimageio-acronym-gradient.png"};
@@ -183,7 +203,11 @@ int main() {
     return 1;
   }
 
+  PerFrameData& frameData = createPersistentUniformBuffer<PerFrameData>(0);
+
   glViewport(0, 0, kWidth, kHeight);
+  glEnable(GL_CULL_FACE);
+  glEnable(GL_DEPTH_TEST);
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     ImGui_ImplOpenGL3_NewFrame();
@@ -191,8 +215,12 @@ int main() {
     ImGui::NewFrame();
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glEnable(GL_CULL_FACE);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    const float t = static_cast<float>(glfwGetTime());
+    const glm::vec3 eye = 10.f * glm::vec3{glm::cos(t), 0.75f, glm::sin(t)};
+    frameData.viewFromWorld = glm::lookAt(eye, glm::vec3{0}, glm::vec3{0, 1, 0});
+    frameData.projectionFromView = glm::perspective(glm::radians(45.0f), static_cast<float>(kWidth) / kHeight, 0.1f, 100.0f);
 
     glUseProgram(program);
     for (const MeshGpu& mg : meshGpus) {
