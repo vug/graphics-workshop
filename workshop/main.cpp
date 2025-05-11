@@ -108,6 +108,7 @@ T& createPersistentUniformBuffer(uint32_t binding) {
 struct PerFrameData {
   glm::mat4 viewFromWorld;
   glm::mat4 projectionFromView;
+  float fishEyeStrength{0.25f};
 };
 
 int main() {
@@ -218,9 +219,14 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     const float t = static_cast<float>(glfwGetTime());
-    const glm::vec3 eye = 10.f * glm::vec3{glm::cos(t), 0.75f, glm::sin(t)};
+    const glm::vec3 eye = 6.f * glm::vec3{glm::cos(t), 0.75f, glm::sin(t)};
     frameData.viewFromWorld = glm::lookAt(eye, glm::vec3{0}, glm::vec3{0, 1, 0});
-    frameData.projectionFromView = glm::perspective(glm::radians(45.0f), static_cast<float>(kWidth) / kHeight, 0.1f, 100.0f);
+    static float fovDegrees = 45.0f;
+    frameData.projectionFromView = glm::perspective(glm::radians(fovDegrees), static_cast<float>(kWidth) / kHeight, 0.1f, 100.0f);
+    ImGui::Begin("Props");
+    ImGui::SliderFloat("Fish eye strength", &frameData.fishEyeStrength, 0.0f, 1.0f);
+    ImGui::SliderFloat("FOV", &fovDegrees, 0.0f, 180.0f);
+    ImGui::End();
 
     glUseProgram(program);
     for (const MeshGpu& mg : meshGpus) {

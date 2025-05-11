@@ -7,6 +7,7 @@ layout(location = 2) in vec2 a_TexCoord1;
 layout(std140, binding = 0) uniform PerFrameData {
     mat4 viewFromWorld;
     mat4 projectionFromView;
+    float fishEyeStrength;
 } u_FrameData;
 
 layout(location = 0) out vec3 v_WorldPosition;
@@ -19,9 +20,15 @@ void main() {
   const vec4 viewPos = u_FrameData.viewFromWorld * worldPos;
   const vec4 projPos = u_FrameData.projectionFromView * viewPos;
 
+  const vec2 ndc = vec2(projPos.xy / projPos.w);
+  const float r = length(ndc);
+  const float distFactor = 1 - u_FrameData.fishEyeStrength * (r * r);
+  const vec2 ndcFish = ndc * distFactor;
+  const vec4 fishEyePos = vec4(ndcFish * projPos.w, projPos.zw);
+
   v_WorldPosition = vec3(worldPos);
   v_Normal = a_Normal;
   v_TexCoord1 = a_TexCoord1;
 
-  gl_Position = projPos;
+  gl_Position = fishEyePos;
 }
