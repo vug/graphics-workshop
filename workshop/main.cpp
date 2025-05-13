@@ -14,6 +14,7 @@
 
 #include <filesystem>
 #include <print>
+#include <ranges>
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
 // Load shader programs compiled to SPIR-V binary format from given files into a new shader program
@@ -85,8 +86,15 @@ MeshGpu createMeshGpu(const Mesh& mesh) {
 void loadMeshesFromAiNode(aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes);
 
 template<typename T>
-T& createPersistentUniformBuffer(uint32_t binding) {
-  const size_t sizeBytes = sizeof(T);
+struct UniformBuffer {
+  GLuint ubo;
+  T* data;
+  uint32_t count;
+};
+
+template<typename T>
+UniformBuffer<T> createPersistentUniformBuffer(uint32_t binding, uint32_t count = 1) {
+  const size_t sizeBytes = sizeof(T) * count;
   GLuint ubo;
   glCreateBuffers(1, &ubo);
   const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
@@ -97,18 +105,22 @@ T& createPersistentUniformBuffer(uint32_t binding) {
   if (mappedPtr == nullptr) {
     std::println("Failed to map uniform buffer {} of size {} persistently!", ubo, sizeBytes);
     glDeleteBuffers(1, &ubo);
-    auto obj = T{};
-    return obj;
+    return UniformBuffer<T>{};
   }
-  T& uboDataStruct = *static_cast<T*>(mappedPtr);
 
-  return uboDataStruct;
+  UniformBuffer<T> ub{ubo, static_cast<T*>(mappedPtr), count};
+
+  return ub;
 }
 
 struct PerFrameData {
   glm::mat4 viewFromWorld;
   glm::mat4 projectionFromView;
   float fishEyeStrength{0.25f};
+};
+
+struct PerObjectData {
+  glm::mat4 worldFromModel;
 };
 
 int main() {
@@ -195,7 +207,6 @@ int main() {
   const OIIO::ImageSpec &spec = inp->spec();
   std::println("Image: width {}, height {}, depth {}, channels {}", spec.width, spec.height, spec.depth, spec.nchannels);
 
-   
   const std::filesystem::path vertFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/solid_color_vert.spv"};
   const std::filesystem::path fragFile{"C:/Users/veliu/repos/graphics-workshop/assets/shaders/solid_color_frag.spv"};
   GLuint program = loadShaderSpirV(vertFile, fragFile);
@@ -203,8 +214,25 @@ int main() {
     std::println("Error loading shaders.");
     return 1;
   }
+  
+  const uint32_t cellCnt = 9;
+  const uint32_t objectCnt = cellCnt * cellCnt;
 
-  PerFrameData& frameData = createPersistentUniformBuffer<PerFrameData>(0);
+  PerFrameData& frameData = *createPersistentUniformBuffer<PerFrameData>(0).data;
+  UniformBuffer<PerObjectData> perObjectData = createPersistentUniformBuffer<PerObjectData>(1, objectCnt);
+
+  std::vector<glm::mat4> transforms;
+  for (uint32_t i = 0; i < cellCnt; ++i) {
+    for (uint32_t j = 0; j < cellCnt; ++j) {
+      const float x = static_cast<float>(i) - static_cast<float>(cellCnt) / 2.f;
+      const float y = static_cast<float>(j) - static_cast<float>(cellCnt) / 2.f;
+      const glm::vec3 pos = {x, 0.f, y};
+      const glm::mat4 transform = glm::translate(glm::mat4(1), 2.f * pos);
+      transforms.push_back(transform);
+      const uint32_t objectIndex = i * cellCnt + j;
+      perObjectData.data[objectIndex].worldFromModel = transform;
+    }
+  }
 
   glViewport(0, 0, kWidth, kHeight);
   glEnable(GL_CULL_FACE);
@@ -224,16 +252,18 @@ int main() {
     static float fovDegrees = 45.0f;
     frameData.projectionFromView = glm::perspective(glm::radians(fovDegrees), static_cast<float>(kWidth) / kHeight, 0.1f, 100.0f);
     ImGui::Begin("Props");
-    ImGui::SliderFloat("Fish eye strength", &frameData.fishEyeStrength, 0.0f, 1.0f);
+    ImGui::SliderFloat("Fish eye strength", &frameData.fishEyeStrength, 0.0f, 2.0f);
     ImGui::SliderFloat("FOV", &fovDegrees, 0.0f, 180.0f);
     ImGui::End();
 
     glUseProgram(program);
-    for (const MeshGpu& mg : meshGpus) {
-      glBindVertexArray(mg.vertexArray);
-      
-      glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mg.numIndices), GL_UNSIGNED_INT, nullptr);
-      glBindVertexArray(0);
+    for (auto const& [ix, transform] : std::views::enumerate(transforms)) {
+      glBindBufferRange(GL_UNIFORM_BUFFER, 1, perObjectData.ubo, sizeof(PerObjectData) * ix, sizeof(PerObjectData));
+      for (const MeshGpu& mg : meshGpus) {
+        glBindVertexArray(mg.vertexArray);   
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mg.numIndices), GL_UNSIGNED_INT, nullptr);
+        glBindVertexArray(0);
+      }
     }
     glUseProgram(0);
 
