@@ -27,7 +27,8 @@ void main() {
 
   const float r = length(ndc);
   const float theta = atan(ndc.y, ndc.x);
-  const float fishR = tanh(u_FrameData.fishEyeStrength * 3.14159265 * r);
+  //const float fishR = tanh(u_FrameData.fishEyeStrength * 3.14159265 * r);
+  const float fishR = pow(r, u_FrameData.fishEyeStrength);
   const vec2 ndcFish = vec2(cos(theta), sin(theta)) * fishR;
 
   // const float distFactor = u_FrameData.fishEyeStrength * sqrt(1 - min(r * r, 1));
