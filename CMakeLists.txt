@@ -6,7 +6,7 @@ message("[VUGDEBUG] Compilers.\n C: ${CMAKE_C_COMPILER}\n CPP: ${CMAKE_CXX_COMPI
 project(GraphicsWorkshop
   VERSION 0.1
   DESCRIPTION "Some 3rd party graphics libraries and some custom functionalities on top of them, so that I won't need to start a new repo from scratch each time I study a topic in computer graphics."
-  LANGUAGES CXX)
+  LANGUAGES C CXX)
 
 include(C:/Users/veliu/repos-other/vcpkg/scripts/buildsystems/vcpkg.cmake)
 find_package(OpenImageIO REQUIRED)

@@ -18,7 +18,7 @@
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
 // Load shader programs compiled to SPIR-V binary format from given files into a new shader program
-// Returns 0 on error
+// Return 0 on error
 GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
 
 struct Vertex {
@@ -41,15 +41,15 @@ struct MeshGpu {
 };
 
 GLuint createVertexBuffer(uint32_t numVertices, GLuint vao) {
-  GLuint vbo;
+  GLuint vbo{};
   glCreateBuffers(1, &vbo);
-  glNamedBufferStorage(vbo, sizeof(Vertex) * numVertices, nullptr, GL_DYNAMIC_STORAGE_BIT);
+  glNamedBufferStorage(vbo, static_cast<GLsizeiptr>(sizeof(Vertex) * numVertices), nullptr, GL_DYNAMIC_STORAGE_BIT);
   glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
   return vbo;
 };
 
 GLuint createIndexBuffer(uint32_t numIndices, GLuint vao) {
-  GLuint ibo;
+  GLuint ibo{};
   glCreateBuffers(1, &ibo);
   glNamedBufferStorage(ibo, sizeof(uint32_t) * numIndices, nullptr, GL_DYNAMIC_STORAGE_BIT);
   glVertexArrayElementBuffer(vao, ibo);
@@ -70,11 +70,11 @@ MeshGpu createMeshGpu(const Mesh& mesh) {
     glVertexArrayAttribBinding(m.vertexArray, ix, 0);
     offset += sizes[ix] * sizeof(float);
   }
-  
+
   m.numVertices = mesh.vertices.size();
   m.vertexBuffer = createVertexBuffer(static_cast<uint32_t>(m.numVertices), m.vertexArray);
 
-  m.numIndices = mesh.indices.size(); 
+  m.numIndices = mesh.indices.size();
   m.indexBuffer = createIndexBuffer(static_cast<uint32_t>(m.numIndices), m.vertexArray);
 
   glNamedBufferSubData(m.vertexBuffer, 0, sizeof(Vertex) * m.numVertices, mesh.vertices.data());
@@ -83,7 +83,7 @@ MeshGpu createMeshGpu(const Mesh& mesh) {
   return m;
 }
 
-void loadMeshesFromAiNode(aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes);
+void loadMeshesFromAiNode(const aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes);
 
 template<typename T>
 struct UniformBuffer {
@@ -97,7 +97,7 @@ UniformBuffer<T> createPersistentUniformBuffer(uint32_t binding, uint32_t count 
   const size_t sizeBytes = sizeof(T) * count;
   GLuint ubo;
   glCreateBuffers(1, &ubo);
-  const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+  constexpr GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
   glNamedBufferStorage(ubo, sizeBytes, nullptr, flags);
   glBindBufferBase(GL_UNIFORM_BUFFER, binding, ubo);
 
@@ -114,8 +114,8 @@ UniformBuffer<T> createPersistentUniformBuffer(uint32_t binding, uint32_t count 
 }
 
 struct PerFrameData {
-  glm::mat4 viewFromWorld;
-  glm::mat4 projectionFromView;
+  glm::mat4 viewFromWorld{};
+  glm::mat4 projectionFromView{};
   float fishEyeStrength{0.25f};
 };
 
@@ -134,9 +134,9 @@ int main() {
   glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
   glfwWindowHint(GLFW_SAMPLES, 8);
 
-  const GLuint kWidth = 1280, kHeight = 768;
+  constexpr GLuint kWidth = 1280, kHeight = 768;
   GLFWwindow* window =
-      glfwCreateWindow(kWidth, kHeight, "LearnOpenGL", NULL, NULL);
+      glfwCreateWindow(kWidth, kHeight, "LearnOpenGL", nullptr, nullptr);
   if (!window) {
     std::println("Failed to create GLFW window");
     glfwTerminate();
@@ -161,7 +161,7 @@ int main() {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
   ImGui::StyleColorsDark();
-  // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+  // When viewports are enabled, we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
   ImGuiStyle& style = ImGui::GetStyle();
   if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
     style.WindowRounding = 0.0f;
@@ -196,7 +196,7 @@ int main() {
   std::vector<MeshGpu> meshGpus;
   for (const auto& mesh : meshes)
     meshGpus.push_back(createMeshGpu(mesh));
-  
+
   std::println("loading a texture");
   const std::filesystem::path texFile{"C:/Users/veliu/repos/graphics-workshop/assets/textures/openimageio-acronym-gradient.png"};
   auto inp = OIIO::ImageInput::open(texFile.string());
@@ -214,9 +214,9 @@ int main() {
     std::println("Error loading shaders.");
     return 1;
   }
-  
-  const uint32_t cellCnt = 9;
-  const uint32_t objectCnt = cellCnt * cellCnt;
+
+  constexpr uint32_t cellCnt = 9;
+  constexpr uint32_t objectCnt = cellCnt * cellCnt;
 
   PerFrameData& frameData = *createPersistentUniformBuffer<PerFrameData>(0).data;
   UniformBuffer<PerObjectData> perObjectData = createPersistentUniformBuffer<PerObjectData>(1, objectCnt);
@@ -246,7 +246,7 @@ int main() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    const float t = static_cast<float>(glfwGetTime());
+    const auto t = static_cast<float>(glfwGetTime());
     const glm::vec3 eye = 6.f * glm::vec3{glm::cos(t), 0.75f, glm::sin(t)};
     frameData.viewFromWorld = glm::lookAt(eye, glm::vec3{0, 0.5f, 0}, glm::vec3{0, 1, 0});
     static float fovDegrees = 45.0f;
@@ -260,7 +260,7 @@ int main() {
     for (auto const& [ix, transform] : std::views::enumerate(transforms)) {
       glBindBufferRange(GL_UNIFORM_BUFFER, 1, perObjectData.ubo, sizeof(PerObjectData) * ix, sizeof(PerObjectData));
       for (const MeshGpu& mg : meshGpus) {
-        glBindVertexArray(mg.vertexArray);   
+        glBindVertexArray(mg.vertexArray);
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mg.numIndices), GL_UNSIGNED_INT, nullptr);
         glBindVertexArray(0);
       }
@@ -298,12 +298,12 @@ bool readBinaryFile(const std::filesystem::path& path, std::vector<std::byte>& o
   if (!std::filesystem::exists(path)) {
     std::println("File does not exist: {}", path.string());
     return false;
-  }    
+  }
   const auto fileSize = std::filesystem::file_size(path);
   if (fileSize == 0) {
     std::println("File is empty: {}", path.string());
     return false;
-  }    
+  }
   std::ifstream file(path, std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
     std::println("Error opening shader file: {}", path.string());
@@ -313,14 +313,14 @@ bool readBinaryFile(const std::filesystem::path& path, std::vector<std::byte>& o
   file.seekg(0, std::ios::beg);
   outBuffer.resize(fileSize);
   file.read(reinterpret_cast<char*>(outBuffer.data()), fileSize);
-  file.close(); 
-  
+  file.close();
+
   return true;
 }
 
 GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
   int32_t success{};
-  const uint32_t infoLogSize = 512;
+  constexpr uint32_t infoLogSize = 512;
   char infoLog[512];
 
   std::vector<std::byte> vertBuffer;
@@ -332,7 +332,7 @@ GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesys
   glSpecializeShader(vertShader, "main", 0, nullptr, nullptr);
   glGetShaderiv(vertShader, GL_COMPILE_STATUS, &success);
   if (!success) {
-    glGetShaderInfoLog(vertShader, infoLogSize, NULL, infoLog);
+    glGetShaderInfoLog(vertShader, infoLogSize, nullptr, infoLog);
     std::println(std::cerr, "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{}", infoLog);
     glDeleteShader(vertShader);
     return 0;
@@ -345,10 +345,10 @@ GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesys
   }
   GLuint fragShader = glCreateShader(GL_FRAGMENT_SHADER);
   glShaderBinary(1, &fragShader, GL_SHADER_BINARY_FORMAT_SPIR_V, fragBuffer.data(), static_cast<GLsizei>(fragBuffer.size()));
-  glSpecializeShader(fragShader, "main", 0, nullptr, nullptr);    
+  glSpecializeShader(fragShader, "main", 0, nullptr, nullptr);
   glGetShaderiv(fragShader, GL_COMPILE_STATUS, &success);
   if (!success) {
-    glGetShaderInfoLog(fragShader, infoLogSize, NULL, infoLog);
+    glGetShaderInfoLog(fragShader, infoLogSize, nullptr, infoLog);
     std::println(std::cerr, "ERROR::SHADER::FRAG::COMPILATION_FAILED\n{}", infoLog);
     glDeleteShader(vertShader);
     glDeleteShader(fragShader);
@@ -361,12 +361,12 @@ GLuint loadShaderSpirV(const std::filesystem::path& vertPath, const std::filesys
   glLinkProgram(program);
   glGetProgramiv(program, GL_LINK_STATUS, &success);
   if (!success) {
-    glGetProgramInfoLog(program, infoLogSize, NULL, infoLog);
+    glGetProgramInfoLog(program, infoLogSize, nullptr, infoLog);
     std::println(std::cerr, "ERROR::SHADER::PROGRAM::LINKING_FAILED\n{}", infoLog);
     glDeleteShader(vertShader);
     glDeleteShader(fragShader);
     glDeleteProgram(program);
-    return 0; 
+    return 0;
   }
 
   glDeleteShader(vertShader);
@@ -410,10 +410,10 @@ Mesh processMesh(const aiMesh *mesh, const aiScene *scene) {
   return outMesh;
 }
 
-void loadMeshesFromAiNode(aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes) {
+void loadMeshesFromAiNode(const aiNode *node, const aiScene *scene, std::vector<Mesh>& outMeshes) { // NOLINT(*-no-recursion)
   for(unsigned int i = 0; i < node->mNumMeshes; i++) {
-      aiMesh *mesh = scene->mMeshes[node->mMeshes[i]]; 
-      outMeshes.push_back(processMesh(mesh, scene));			
+      aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+      outMeshes.push_back(processMesh(mesh, scene));
   }
   for(unsigned int i = 0; i < node->mNumChildren; i++) {
     loadMeshesFromAiNode(node->mChildren[i], scene, outMeshes);
